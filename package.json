@@ -22,7 +22,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "pack:smoke": "node scripts/pack-smoke.mjs"
   },
   "dependencies": {
     "commander": "^13.1.0",
@@ -35,6 +36,7 @@
     "@types/ws": "^8.5.14",
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.1.1",
+    "linkedom": "^0.18.13",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.0",

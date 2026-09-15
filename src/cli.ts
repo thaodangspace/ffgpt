@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command, CommanderError } from 'commander';
 import packageJson from '../package.json' with { type: 'json' };
 import { runAsk, type AskCommandOptions } from './commands/ask.js';
@@ -65,7 +67,7 @@ export async function runCli(
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isCliEntrypoint()) {
   runCli()
     .then((code) => {
       process.exitCode = code;
@@ -78,4 +80,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 function formatExitCode(error: unknown): number {
   return toFfgptError(error).exitCode;
+}
+
+function isCliEntrypoint(): boolean {
+  if (process.argv[1] === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
 }

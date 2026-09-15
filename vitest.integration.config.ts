@@ -1,11 +1,8 @@
-import { defineConfig, mergeConfig } from 'vitest/config';
-import baseConfig from './vitest.config.js';
+import { defineConfig } from 'vitest/config';
 
-export default mergeConfig(
-  baseConfig,
-  defineConfig({
-    test: {
-      include: ['tests/integration/**/*.test.ts'],
-    },
-  }),
-);
+export default defineConfig({
+  test: {
+    include: ['tests/integration/**/*.test.ts'],
+    exclude: [],
+  },
+});
