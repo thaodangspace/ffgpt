@@ -170,6 +170,23 @@ export class FirefoxBiDiDriver implements BrowserDriver {
     return fromRemoteValue(response.result) as T;
   }
 
+  async pressKey(contextId: string, key: string): Promise<void> {
+    this.ensureConnected();
+    await this.command('input.performActions', {
+      context: contextId,
+      actions: [
+        {
+          type: 'key',
+          id: 'ffgpt-keyboard',
+          actions: [
+            { type: 'keyDown', value: key },
+            { type: 'keyUp', value: key },
+          ],
+        },
+      ],
+    });
+  }
+
   async disconnect(): Promise<void> {
     const socket = this.socket;
     this.connected = false;

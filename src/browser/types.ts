@@ -14,5 +14,6 @@ export interface BrowserDriver {
     functionDeclaration: string,
     args?: readonly unknown[],
   ): Promise<T>;
+  pressKey(contextId: string, key: string): Promise<void>;
   disconnect(): Promise<void>;
 }
