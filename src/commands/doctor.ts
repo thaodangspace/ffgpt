@@ -57,8 +57,8 @@ export async function runDoctor(
       name: 'config',
       status: 'ok',
       message: config.configFileLoaded
-        ? `config loaded: ${config.configPath}`
-        : `config not found; using defaults (${config.configPath})`,
+        ? `config loaded: ${config.configPath}; Firefox ${config.browser.host}:${config.browser.port}; timeout ${config.browser.timeoutMs}ms`
+        : `config not found; using defaults (${config.configPath}); Firefox ${config.browser.host}:${config.browser.port}; timeout ${config.browser.timeoutMs}ms`,
     });
     logger.verbose(`config path: ${config.configPath}`);
     logger.verbose(`Firefox endpoint: ${config.browser.host}:${config.browser.port}`);
@@ -166,7 +166,7 @@ export async function runDoctor(
     checks.push({ name: 'composer', status: 'ok', message: 'ChatGPT composer is ready' });
   } catch (error: unknown) {
     failure = toFfgptError(error);
-    checks.push(failureCheck(failure));
+    checks.push(failureCheck(failure, config.browser.port));
   } finally {
     try {
       await browser.disconnect();
@@ -178,7 +178,7 @@ export async function runDoctor(
             : new BrowserConnectionError('Could not safely disconnect the WebDriver BiDi client.', {
                 cause: error,
               });
-        checks.push(failureCheck(failure));
+        checks.push(failureCheck(failure, config.browser.port));
       }
     }
   }
@@ -190,10 +190,10 @@ export async function runDoctor(
   write('\nReady to send prompts.\n');
 }
 
-function failureCheck(error: FfgptError): DoctorCheck {
+function failureCheck(error: FfgptError, port = 9222): DoctorCheck {
   const hint =
     error.kind === 'browser-connection' || error.kind === 'browser-protocol'
-      ? 'Start Firefox with remote debugging enabled, for example: firefox --remote-debugging-port 9222'
+      ? `Start Firefox with remote debugging enabled, for example: firefox --remote-debugging-port ${port}`
       : error.kind === 'timeout'
         ? 'Check Firefox responsiveness and increase --timeout if the local machine is busy.'
         : error.kind === 'chatgpt-not-ready'

@@ -32,7 +32,7 @@ pnpm install
 pnpm build
 ```
 
-The package exposes the `ffgpt` executable. In a checkout, use `pnpm exec ffgpt ...` or install the packed artifact in a separate directory. The packed-artifact smoke test is available with `pnpm pack:smoke`.
+The package exposes the `ffgpt` executable. In a checkout after `pnpm build`, run `node dist/cli.js ...` or install the packed artifact in a separate directory. The packed-artifact smoke test is available with `pnpm pack:smoke`.
 
 ## Basic usage
 

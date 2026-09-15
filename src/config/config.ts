@@ -82,7 +82,7 @@ export function resolveProjectAlias(
     return undefined;
   }
 
-  const projectUrl = config.projects[alias];
+  const projectUrl = Object.hasOwn(config.projects, alias) ? config.projects[alias] : undefined;
   if (projectUrl === undefined) {
     const available = Object.keys(config.projects).sort();
     const suffix =
@@ -194,7 +194,7 @@ function validateFileConfig(
     if (typeof raw.defaultProject !== 'string' || raw.defaultProject.length === 0) {
       throw new Error(`${configPath}: defaultProject must be a non-empty alias string`);
     }
-    if (!(raw.defaultProject in projects)) {
+    if (!Object.hasOwn(projects, raw.defaultProject)) {
       throw new Error(
         `${configPath}: defaultProject "${raw.defaultProject}" is not configured in projects`,
       );

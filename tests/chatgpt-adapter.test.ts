@@ -11,7 +11,7 @@ class FakeBrowser implements BrowserDriver {
   composerText = '';
   confirmationText = '';
   confirmationStopVisible = false;
-  confirmationUserMessageVisible = false;
+  confirmationUserMessageCount = 0;
 
   async connect(): Promise<void> {}
 
@@ -50,7 +50,7 @@ class FakeBrowser implements BrowserDriver {
     return {
       composerText: this.confirmationText,
       stopVisible: this.confirmationStopVisible,
-      userMessageVisible: this.confirmationUserMessageVisible,
+      userMessageCount: this.confirmationUserMessageCount,
     } as T;
   }
 
@@ -96,6 +96,7 @@ describe('ChatGPTAdapter', () => {
   it('does not retry after ambiguous confirmation', async () => {
     const browser = new FakeBrowser();
     browser.confirmationText = 'inserted prompt';
+    browser.confirmationUserMessageCount = 5;
     const adapter = new ChatGPTAdapter({
       browser,
       timeoutMs: 1,

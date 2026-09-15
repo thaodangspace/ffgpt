@@ -1,5 +1,6 @@
 import { isAllowedChatGptUrl } from '../config/index.js';
 import type { BrowserContextInfo, BrowserDriver } from '../browser/index.js';
+import { FfgptError } from '../errors/index.js';
 import {
   ChatGPTNotReadyError,
   NavigationError,
@@ -23,6 +24,8 @@ export interface PrepareTargetOptions {
 export interface ChatGPTAdapterOptions {
   browser: BrowserDriver;
   timeoutMs?: number;
+  composerTimeoutMs?: number;
+  confirmationTimeoutMs?: number;
   sleep?: (milliseconds: number) => Promise<void>;
 }
 
@@ -47,7 +50,7 @@ interface SubmitResult {
 interface ConfirmationState {
   composerText: string;
   stopVisible: boolean;
-  userMessageVisible: boolean;
+  userMessageCount: number;
 }
 
 export const INSPECT_PAGE_FUNCTION = `function (composerSelectors, sendSelectors) {
@@ -63,7 +66,10 @@ export const INSPECT_PAGE_FUNCTION = `function (composerSelectors, sendSelectors
     return element.innerText ?? element.textContent ?? '';
   };
   const loginVisible = Boolean(
-    document.querySelector('a[href*="/auth/login"], form[action*="/auth/login"], [data-testid="login-button"]'),
+    location.pathname.includes('/auth/') ||
+      document.querySelector(
+        'a[href*="/auth/login"], form[action*="/auth/login"], [data-testid="login-button"]',
+      ),
   );
   if (loginVisible) return { status: 'login' };
   const composer = find(composerSelectors);
@@ -142,24 +148,29 @@ const CONFIRMATION_FUNCTION = `function (composerSelectors, stopSelectors) {
   const composerText = composer
     ? ('value' in composer && typeof composer.value === 'string' ? composer.value : composer.innerText ?? composer.textContent ?? '')
     : '';
-  const userMessageVisible = Boolean(document.querySelector('[data-message-author-role="user"], [data-testid*="conversation-turn-user"]'));
+  const userMessageCount = document.querySelectorAll(
+    '[data-message-author-role="user"], [data-testid*="conversation-turn-user"]',
+  ).length;
   return {
     composerText,
     stopVisible: find(stopSelectors),
-    userMessageVisible,
+    userMessageCount,
   };
 }`;
 
 export class ChatGPTAdapter {
   private readonly browser: BrowserDriver;
-  private readonly timeoutMs: number;
+  private readonly composerTimeoutMs: number;
+  private readonly confirmationTimeoutMs: number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private contextId: string | undefined;
   private submissionActionIssued = false;
 
   constructor(options: ChatGPTAdapterOptions) {
     this.browser = options.browser;
-    this.timeoutMs = options.timeoutMs ?? 5_000;
+    const defaultTimeout = options.timeoutMs ?? 5_000;
+    this.composerTimeoutMs = options.composerTimeoutMs ?? defaultTimeout;
+    this.confirmationTimeoutMs = options.confirmationTimeoutMs ?? defaultTimeout;
     this.sleep = options.sleep ?? defaultSleep;
   }
 
@@ -174,6 +185,9 @@ export class ChatGPTAdapter {
     try {
       contexts = await this.browser.listContexts();
     } catch (error: unknown) {
+      if (error instanceof FfgptError) {
+        throw error;
+      }
       throw new NavigationError('Could not inspect Firefox browsing contexts.', { cause: error });
     }
 
@@ -184,6 +198,9 @@ export class ChatGPTAdapter {
       try {
         contextId = await this.browser.createContext();
       } catch (error: unknown) {
+        if (error instanceof FfgptError) {
+          throw error;
+        }
         throw new NavigationError('Could not create a Firefox tab for ChatGPT.', { cause: error });
       }
     }
@@ -193,6 +210,9 @@ export class ChatGPTAdapter {
       try {
         await this.browser.navigate(contextId, targetUrl);
       } catch (error: unknown) {
+        if (error instanceof FfgptError) {
+          throw error;
+        }
         throw new NavigationError(
           `Could not navigate the ChatGPT tab to ${sanitizeTargetUrl(targetUrl)}.`,
           {
@@ -243,6 +263,21 @@ export class ChatGPTAdapter {
       );
     }
 
+    let baseline: ConfirmationState;
+    try {
+      baseline = await this.browser.evaluate<ConfirmationState>(contextId, CONFIRMATION_FUNCTION, [
+        selectorNames(COMPOSER_SELECTORS),
+        selectorNames(STOP_BUTTON_SELECTORS),
+      ]);
+    } catch (error: unknown) {
+      if (error instanceof FfgptError) {
+        throw error;
+      }
+      throw new SubmissionError('Could not establish the pre-submit confirmation state.', {
+        cause: error,
+      });
+    }
+
     this.submissionActionIssued = true;
     let submission: SubmitResult;
     try {
@@ -265,7 +300,7 @@ export class ChatGPTAdapter {
       });
     }
 
-    await this.confirmSubmission(contextId);
+    await this.confirmSubmission(contextId, baseline);
   }
 
   private async chooseContext(
@@ -282,7 +317,10 @@ export class ChatGPTAdapter {
       try {
         const state = await this.inspectPage(context.id);
         if (state.status === 'ready') return context;
-      } catch {
+      } catch (error: unknown) {
+        if (error instanceof FfgptError) {
+          throw error;
+        }
         // A context may be transitioning. It can still be selected and waited on below.
       }
     }
@@ -294,7 +332,7 @@ export class ChatGPTAdapter {
     if (contextId === undefined) {
       throw new ChatGPTNotReadyError('No ChatGPT browsing context is available.');
     }
-    const deadline = Date.now() + this.timeoutMs;
+    const deadline = Date.now() + this.composerTimeoutMs;
     let lastState: ChatGPTPageState | undefined;
     while (Date.now() <= deadline) {
       lastState = await this.inspectPage(contextId);
@@ -317,6 +355,9 @@ export class ChatGPTAdapter {
     try {
       return await inspectChatGPTPage(this.browser, contextId);
     } catch (error: unknown) {
+      if (error instanceof FfgptError) {
+        throw error;
+      }
       throw new ChatGPTNotReadyError(
         'ChatGPT page inspection failed before the readiness timeout.',
         {
@@ -326,8 +367,8 @@ export class ChatGPTAdapter {
     }
   }
 
-  private async confirmSubmission(contextId: string): Promise<void> {
-    const deadline = Date.now() + this.timeoutMs;
+  private async confirmSubmission(contextId: string, baseline: ConfirmationState): Promise<void> {
+    const deadline = Date.now() + this.confirmationTimeoutMs;
     while (Date.now() <= deadline) {
       let state: ConfirmationState;
       try {
@@ -341,7 +382,11 @@ export class ChatGPTAdapter {
           { cause: error },
         );
       }
-      if (state.composerText.length === 0 || state.stopVisible || state.userMessageVisible) {
+      if (
+        state.composerText.length === 0 ||
+        (!baseline.stopVisible && state.stopVisible) ||
+        state.userMessageCount > baseline.userMessageCount
+      ) {
         return;
       }
       await this.sleep(Math.min(100, Math.max(1, deadline - Date.now())));
