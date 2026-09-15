@@ -189,6 +189,17 @@ export class FirefoxBiDiDriver implements BrowserDriver {
 
   async disconnect(): Promise<void> {
     const socket = this.socket;
+    const hasSession = this.connected;
+    let sessionEndError: unknown;
+
+    if (socket !== undefined && hasSession && socket.readyState === WebSocket.OPEN) {
+      try {
+        await this.command('session.end', {});
+      } catch (error: unknown) {
+        sessionEndError = error;
+      }
+    }
+
     this.connected = false;
     this.socket = undefined;
     if (socket === undefined) {
@@ -203,6 +214,10 @@ export class FirefoxBiDiDriver implements BrowserDriver {
     }
     this.pending.clear();
     await this.closeSocket(socket);
+
+    if (sessionEndError !== undefined) {
+      throw sessionEndError;
+    }
   }
 
   private async command<T>(method: string, params: Record<string, unknown>): Promise<T> {

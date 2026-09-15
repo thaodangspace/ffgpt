@@ -62,8 +62,11 @@ export const INSPECT_PAGE_FUNCTION = `function (composerSelectors, sendSelectors
     return undefined;
   };
   const readText = (element) => {
-    if ('value' in element && typeof element.value === 'string') return element.value;
-    return element.innerText ?? element.textContent ?? '';
+    const text =
+      'value' in element && typeof element.value === 'string'
+        ? element.value
+        : element.innerText ?? element.textContent ?? '';
+    return text.trim().length === 0 ? '' : text;
   };
   const loginVisible = Boolean(
     location.pathname.includes('/auth/') ||
@@ -92,8 +95,11 @@ const INSERT_PROMPT_FUNCTION = `function (text, composerSelectors) {
     return undefined;
   };
   const readText = (element) => {
-    if ('value' in element && typeof element.value === 'string') return element.value;
-    return element.innerText ?? element.textContent ?? '';
+    const text =
+      'value' in element && typeof element.value === 'string'
+        ? element.value
+        : element.innerText ?? element.textContent ?? '';
+    return text.trim().length === 0 ? '' : text;
   };
   const composer = find(composerSelectors);
   if (!composer) return { ok: false, reason: 'composer-missing' };
@@ -145,9 +151,14 @@ const CONFIRMATION_FUNCTION = `function (composerSelectors, stopSelectors) {
     }
     return undefined;
   })();
-  const composerText = composer
-    ? ('value' in composer && typeof composer.value === 'string' ? composer.value : composer.innerText ?? composer.textContent ?? '')
-    : '';
+  const composerText = (() => {
+    if (!composer) return '';
+    const text =
+      'value' in composer && typeof composer.value === 'string'
+        ? composer.value
+        : composer.innerText ?? composer.textContent ?? '';
+    return text.trim().length === 0 ? '' : text;
+  })();
   const userMessageCount = document.querySelectorAll(
     '[data-message-author-role="user"], [data-testid*="conversation-turn-user"]',
   ).length;

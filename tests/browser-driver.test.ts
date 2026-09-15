@@ -25,7 +25,7 @@ class FakeWebSocket extends EventEmitter {
   send(serialized: string): void {
     this.sent.push(serialized);
     const message = JSON.parse(serialized) as { id: number; method: string };
-    if (message.method === 'session.new') {
+    if (message.method === 'session.new' || message.method === 'session.end') {
       queueMicrotask(() =>
         this.emit('message', JSON.stringify({ id: message.id, type: 'success', result: {} })),
       );
@@ -59,7 +59,7 @@ describe('FirefoxBiDiDriver lifecycle', () => {
     expect(sockets).toHaveLength(1);
     expect(sockets[0]?.url).toBe('ws://127.0.0.1:9222/session');
     const methods = sockets[0]?.sent.map((message) => JSON.parse(message).method);
-    expect(methods).toEqual(['session.new']);
+    expect(methods).toEqual(['session.new', 'session.end']);
   });
 
   it('rejects operations after disconnect', async () => {
