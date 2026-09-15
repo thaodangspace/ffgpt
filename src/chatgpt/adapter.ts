@@ -26,7 +26,7 @@ export interface ChatGPTAdapterOptions {
   sleep?: (milliseconds: number) => Promise<void>;
 }
 
-interface PageState {
+export interface ChatGPTPageState {
   status: 'ready' | 'login' | 'unsupported' | 'composer-missing';
   composerSelector?: string;
   composerText?: string;
@@ -50,7 +50,7 @@ interface ConfirmationState {
   userMessageVisible: boolean;
 }
 
-const INSPECT_PAGE_FUNCTION = `function (composerSelectors, sendSelectors) {
+export const INSPECT_PAGE_FUNCTION = `function (composerSelectors, sendSelectors) {
   const find = (selectors) => {
     for (const selector of selectors) {
       const element = document.querySelector(selector);
@@ -295,7 +295,7 @@ export class ChatGPTAdapter {
       throw new ChatGPTNotReadyError('No ChatGPT browsing context is available.');
     }
     const deadline = Date.now() + this.timeoutMs;
-    let lastState: PageState | undefined;
+    let lastState: ChatGPTPageState | undefined;
     while (Date.now() <= deadline) {
       lastState = await this.inspectPage(contextId);
       if (lastState.status === 'ready') return;
@@ -313,12 +313,9 @@ export class ChatGPTAdapter {
     );
   }
 
-  private async inspectPage(contextId: string): Promise<PageState> {
+  private async inspectPage(contextId: string): Promise<ChatGPTPageState> {
     try {
-      return await this.browser.evaluate<PageState>(contextId, INSPECT_PAGE_FUNCTION, [
-        selectorNames(COMPOSER_SELECTORS),
-        selectorNames(SEND_BUTTON_SELECTORS),
-      ]);
+      return await inspectChatGPTPage(this.browser, contextId);
     } catch (error: unknown) {
       throw new ChatGPTNotReadyError(
         'ChatGPT page inspection failed before the readiness timeout.',
@@ -355,7 +352,7 @@ export class ChatGPTAdapter {
     );
   }
 
-  private notReadyError(status: PageState['status']): ChatGPTNotReadyError {
+  private notReadyError(status: ChatGPTPageState['status']): ChatGPTNotReadyError {
     if (status === 'login') {
       return new ChatGPTNotReadyError(
         'ChatGPT is not logged in. Sign in to chatgpt.com in Firefox, then retry; ffgpt never enters credentials.',
@@ -370,6 +367,16 @@ export class ChatGPTAdapter {
       'ChatGPT is not ready for prompt submission. Open a logged-in chatgpt.com tab and retry.',
     );
   }
+}
+
+export async function inspectChatGPTPage(
+  browser: BrowserDriver,
+  contextId: string,
+): Promise<ChatGPTPageState> {
+  return browser.evaluate<ChatGPTPageState>(contextId, INSPECT_PAGE_FUNCTION, [
+    selectorNames(COMPOSER_SELECTORS),
+    selectorNames(SEND_BUTTON_SELECTORS),
+  ]);
 }
 
 function isChatGPTPageUrl(value: string): boolean {

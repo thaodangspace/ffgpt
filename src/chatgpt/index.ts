@@ -1,4 +1,4 @@
-export { CHATGPT_HOME_URL, ChatGPTAdapter, ENTER_KEY } from './adapter.js';
+export { CHATGPT_HOME_URL, ChatGPTAdapter, ENTER_KEY, inspectChatGPTPage } from './adapter.js';
 export {
   ChatGPTAdapterError,
   ChatGPTNotReadyError,
@@ -13,6 +13,6 @@ export {
   chooseSelector,
   selectorNames,
 } from './selectors.js';
-export type { ChatGPTAdapterOptions, PrepareTargetOptions } from './adapter.js';
+export type { ChatGPTAdapterOptions, ChatGPTPageState, PrepareTargetOptions } from './adapter.js';
 export type { ChatGPTErrorCode } from './errors.js';
 export type { SelectorCandidate } from './selectors.js';
