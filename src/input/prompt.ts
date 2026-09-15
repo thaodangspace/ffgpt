@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { UsageError } from '../errors/index.js';
 
 export const MAX_PROMPT_BYTES = 1_048_576;
 
@@ -24,7 +25,9 @@ export function buildPrompt(
         : stdin;
 
   if (prompt === undefined || prompt.trim().length === 0) {
-    throw new Error('Prompt is empty. Provide prompt text as an argument or through piped stdin.');
+    throw new UsageError(
+      'Prompt is empty. Provide prompt text as an argument or through piped stdin.',
+    );
   }
   assertWithinLimit(prompt, maxBytes);
   return prompt;
@@ -51,7 +54,7 @@ export async function readPrompt(
     const buffer = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : Buffer.from(chunk);
     byteLength += buffer.byteLength;
     if (byteLength > maxBytes) {
-      throw new Error(`Prompt input exceeds the maximum size of ${maxBytes} bytes.`);
+      throw new UsageError(`Prompt input exceeds the maximum size of ${maxBytes} bytes.`);
     }
     chunks.push(buffer);
   }
@@ -61,11 +64,11 @@ export async function readPrompt(
 
 function assertWithinLimit(value: string, maxBytes: number): void {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
-    throw new Error('Prompt maximum size must be a positive integer.');
+    throw new UsageError('Prompt maximum size must be a positive integer.');
   }
   const byteLength = Buffer.byteLength(value, 'utf8');
   if (byteLength > maxBytes) {
-    throw new Error(`Prompt input exceeds the maximum size of ${maxBytes} bytes.`);
+    throw new UsageError(`Prompt input exceeds the maximum size of ${maxBytes} bytes.`);
   }
 }
 

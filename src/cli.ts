@@ -4,6 +4,7 @@ import { Command, CommanderError } from 'commander';
 import packageJson from '../package.json' with { type: 'json' };
 import { runAsk, type AskCommandOptions } from './commands/ask.js';
 import { runDoctor, type DoctorCommandOptions } from './commands/doctor.js';
+import { EXIT_CODES, formatError, toFfgptError } from './errors/index.js';
 
 export interface CliHandlers {
   ask?: (prompt: string | undefined, options: AskCommandOptions) => Promise<void>;
@@ -16,7 +17,8 @@ export function createProgram(handlers: CliHandlers = {}): Command {
     .name('ffgpt')
     .description('Fire-and-forget prompts to ChatGPT through Firefox WebDriver BiDi')
     .version(packageJson.version)
-    .showSuggestionAfterError();
+    .showSuggestionAfterError()
+    .exitOverride();
 
   program
     .command('ask')
@@ -56,8 +58,8 @@ export async function runCli(
   } catch (error: unknown) {
     if (error instanceof CommanderError) {
       return error.code === 'commander.helpDisplayed' || error.code === 'commander.version'
-        ? 0
-        : error.exitCode;
+        ? EXIT_CODES.success
+        : EXIT_CODES.usage;
     }
     throw error;
   }
@@ -69,8 +71,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       process.exitCode = code;
     })
     .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`${message}\n`);
-      process.exitCode = 1;
+      process.stderr.write(formatError(error, { verbose: process.argv.includes('--verbose') }));
+      process.exitCode = formatExitCode(error);
     });
+}
+
+function formatExitCode(error: unknown): number {
+  return toFfgptError(error).exitCode;
 }

@@ -2,6 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import YAML from 'yaml';
+import { ConfigError } from '../errors/index.js';
 
 export const DEFAULT_BROWSER_HOST = '127.0.0.1';
 export const DEFAULT_BROWSER_PORT = 9222;
@@ -88,7 +89,7 @@ export function resolveProjectAlias(
       available.length > 0
         ? ` Available aliases: ${available.join(', ')}.`
         : ' No aliases are configured.';
-    throw new Error(`Unknown ChatGPT Project alias "${alias}".${suffix}`);
+    throw new ConfigError(`Unknown ChatGPT Project alias "${alias}".${suffix}`);
   }
 
   return projectUrl;
@@ -104,24 +105,32 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Ffgpt
       ...(options.homeDirectory === undefined ? {} : { homeDirectory: options.homeDirectory }),
       ...(options.platform === undefined ? {} : { platform: options.platform }),
     });
-  const fileConfig = await readConfigFile(configPath);
-  const config = validateFileConfig(fileConfig, configPath);
-  const overrides = options.overrides ?? {};
 
-  const host = parseHost(overrides.host ?? env.FFGPT_HOST ?? config.browser.host, 'browser.host');
-  const port = parsePort(overrides.port ?? env.FFGPT_PORT ?? config.browser.port, 'browser.port');
-  const timeoutMs = parsePositiveInteger(
-    overrides.timeoutMs ?? env.FFGPT_TIMEOUT_MS ?? config.browser.timeoutMs,
-    'browser.timeoutMs',
-  );
+  try {
+    const fileConfig = await readConfigFile(configPath);
+    const config = validateFileConfig(fileConfig, configPath);
+    const overrides = options.overrides ?? {};
 
-  return {
-    browser: { host, port, timeoutMs },
-    projects: config.projects,
-    ...(config.defaultProject === undefined ? {} : { defaultProject: config.defaultProject }),
-    configPath,
-    configFileLoaded: fileConfig !== undefined,
-  };
+    const host = parseHost(overrides.host ?? env.FFGPT_HOST ?? config.browser.host, 'browser.host');
+    const port = parsePort(overrides.port ?? env.FFGPT_PORT ?? config.browser.port, 'browser.port');
+    const timeoutMs = parsePositiveInteger(
+      overrides.timeoutMs ?? env.FFGPT_TIMEOUT_MS ?? config.browser.timeoutMs,
+      'browser.timeoutMs',
+    );
+
+    return {
+      browser: { host, port, timeoutMs },
+      projects: config.projects,
+      ...(config.defaultProject === undefined ? {} : { defaultProject: config.defaultProject }),
+      configPath,
+      configFileLoaded: fileConfig !== undefined,
+    };
+  } catch (error: unknown) {
+    if (error instanceof ConfigError) {
+      throw error;
+    }
+    throw new ConfigError(errorMessage(error), { cause: error });
+  }
 }
 
 async function readConfigFile(configPath: string): Promise<RawConfig | undefined> {

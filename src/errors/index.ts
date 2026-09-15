@@ -1,0 +1,21 @@
+export {
+  BrowserCommandTimeoutError,
+  BrowserConnectionError,
+  BrowserDriverError,
+  BrowserProtocolError,
+  ChatGPTAdapterError,
+  ChatGPTNotReadyError,
+  ConfigError,
+  FfgptError,
+  InternalError,
+  NavigationError,
+  SubmissionError,
+  SubmissionNotConfirmedError,
+  TimeoutError,
+  UsageError,
+  EXIT_CODES,
+  formatError,
+  isFfgptError,
+  toFfgptError,
+} from './model.js';
+export type { BrowserErrorCode, ChatGPTErrorCode, ExitCode, FfgptErrorKind } from './model.js';
